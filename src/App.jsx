@@ -159,7 +159,7 @@ export default function App() {
     "Other",
   ];
 
-  const platformOptions = ["ChatGPT", "Midjourney", "Bing"];
+  const platformOptions = ["ChatGPT", "Midjourney", "Bing", "Gemini"];
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-6 relative">
@@ -190,14 +190,14 @@ export default function App() {
             <input
               type="email"
               placeholder="Email"
-              className="px-2 py-1 rounded text-black w-full mb-2"
+              className="px-2 py-2 rounded bg-white text-black w-full mb-2"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
             <input
               type="password"
               placeholder="Password"
-              className="px-2 py-1 rounded text-black w-full mb-2"
+              className="px-2 py-2 rounded bg-white text-black w-full mb-2"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
