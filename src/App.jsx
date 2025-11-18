@@ -30,9 +30,12 @@ export default function App() {
   const [newImage, setNewImage] = useState(null);
   const [newCategory, setNewCategory] = useState("Other");
   const [newPlatform, setNewPlatform] = useState("Midjourney");
+  const [newTags, setNewTags] = useState([]);
+  const [tagInput, setTagInput] = useState("");
 
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterPlatform, setFilterPlatform] = useState("All");
+  const [filterTags, setFilterTags] = useState("");
 
   const [previewImage, setPreviewImage] = useState(null);
 
@@ -43,6 +46,8 @@ export default function App() {
   const [editPlatform, setEditPlatform] = useState("");
   const [editImage, setEditImage] = useState(null);
   const [editImageUrl, setEditImageUrl] = useState(null);
+  const [editTags, setEditTags] = useState([]);
+  const [editTagInput, setEditTagInput] = useState("");
 
   // ✅ Auth States
   const [user, setUser] = useState(null);
@@ -50,6 +55,31 @@ export default function App() {
   const [password, setPassword] = useState("");
 
   const promptsCollection = collection(db, "prompts");
+
+  // ✅ Tag management helpers
+  const handleAddTag = () => {
+    const trimmedTag = tagInput.trim().toLowerCase();
+    if (trimmedTag && !newTags.includes(trimmedTag)) {
+      setNewTags([...newTags, trimmedTag]);
+      setTagInput("");
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove) => {
+    setNewTags(newTags.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleAddEditTag = () => {
+    const trimmedTag = editTagInput.trim().toLowerCase();
+    if (trimmedTag && !editTags.includes(trimmedTag)) {
+      setEditTags([...editTags, trimmedTag]);
+      setEditTagInput("");
+    }
+  };
+
+  const handleRemoveEditTag = (tagToRemove) => {
+    setEditTags(editTags.filter((tag) => tag !== tagToRemove));
+  };
 
   // ✅ Watch Firebase Auth state
   useEffect(() => {
@@ -98,6 +128,7 @@ export default function App() {
       category: newCategory,
       platform: newPlatform,
       imageUrl: imageUrl,
+      tags: newTags,
       createdAt: serverTimestamp(),
     };
 
@@ -114,6 +145,8 @@ export default function App() {
     setNewImage(null);
     setNewCategory("Other");
     setNewPlatform("Midjourney");
+    setNewTags([]);
+    setTagInput("");
   };
 
   // ✅ Start editing a prompt
@@ -124,6 +157,8 @@ export default function App() {
     setEditPlatform(prompt.platform);
     setEditImageUrl(prompt.imageUrl || null);
     setEditImage(null);
+    setEditTags(prompt.tags || []);
+    setEditTagInput("");
   };
 
   // ✅ Cancel editing
@@ -134,6 +169,8 @@ export default function App() {
     setEditPlatform("");
     setEditImage(null);
     setEditImageUrl(null);
+    setEditTags([]);
+    setEditTagInput("");
   };
 
   // ✅ Save edited prompt
@@ -152,6 +189,7 @@ export default function App() {
       category: editCategory,
       platform: editPlatform,
       imageUrl: imageUrl,
+      tags: editTags,
     };
 
     // Update in Firebase
@@ -186,6 +224,7 @@ export default function App() {
     setSearchQuery("");
     setFilterCategory("All");
     setFilterPlatform("All");
+    setFilterTags("");
   };
 
   // ✅ Login & Logout
@@ -212,7 +251,16 @@ export default function App() {
       filterCategory === "All" || p.category === filterCategory;
     const matchesPlatform =
       filterPlatform === "All" || p.platform === filterPlatform;
-    return matchesSearch && matchesCategory && matchesPlatform;
+
+    // Tag filtering - search if any tag contains the filter text
+    const matchesTags =
+      !filterTags.trim() ||
+      (p.tags &&
+        p.tags.some((tag) =>
+          tag.toLowerCase().includes(filterTags.toLowerCase())
+        ));
+
+    return matchesSearch && matchesCategory && matchesPlatform && matchesTags;
   });
 
   const categoryOptions = [
@@ -313,6 +361,13 @@ export default function App() {
             </option>
           ))}
         </select>
+        <input
+          type="text"
+          placeholder="Search tags..."
+          className="p-3 rounded-lg text-black bg-white placeholder-gray-500 focus:ring-2 focus:ring-yellow-400"
+          value={filterTags}
+          onChange={(e) => setFilterTags(e.target.value)}
+        />
 
         {/* ✅ Reset Filters Button */}
         <button
@@ -377,6 +432,52 @@ export default function App() {
               </span>
             )}
           </label>
+
+          {/* Tags Input */}
+          <div className="mt-3">
+            <label className="text-sm text-gray-300 mb-1 block">Tags</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Add a tag..."
+                className="flex-1 p-2 rounded bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-400"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddTag();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition"
+                onClick={handleAddTag}
+              >
+                + Add
+              </button>
+            </div>
+            {newTags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {newTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full flex items-center gap-2"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      className="hover:text-red-300"
+                      onClick={() => handleRemoveTag(tag)}
+                    >
+                      ✖
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Add Prompt Button */}
           <button
@@ -479,6 +580,54 @@ export default function App() {
                     </select>
                   </div>
 
+                  {/* Tags Input */}
+                  <div>
+                    <label className="text-xs text-gray-300 mb-1 block">
+                      Tags
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add a tag..."
+                        className="flex-1 p-2 rounded bg-gray-700 text-white text-xs placeholder-gray-400 focus:ring-2 focus:ring-yellow-400"
+                        value={editTagInput}
+                        onChange={(e) => setEditTagInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddEditTag();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-2 rounded transition"
+                        onClick={handleAddEditTag}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                    {editTags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {editTags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1"
+                          >
+                            {tag}
+                            <button
+                              type="button"
+                              className="hover:text-red-300"
+                              onClick={() => handleRemoveEditTag(tag)}
+                            >
+                              ✖
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Action Buttons */}
                   <div className="flex gap-2">
                     <button
@@ -513,10 +662,28 @@ export default function App() {
                   )}
 
                   <p className="text-sm text-gray-200 mb-1">{prompt.text}</p>
-                  <div className="text-xs text-gray-400 mb-8">
+                  <div className="text-xs text-gray-400 mb-2">
                     <span className="mr-2">📂 {prompt.category}</span>
                     <span>💻 {prompt.platform}</span>
                   </div>
+
+                  {/* Tags Display */}
+                  {prompt.tags && prompt.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-8">
+                      {prompt.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {!prompt.tags || prompt.tags.length === 0 ? (
+                    <div className="mb-8"></div>
+                  ) : null}
 
                   {/* Action Buttons */}
                   <div className="absolute bottom-2 right-2 flex gap-2">

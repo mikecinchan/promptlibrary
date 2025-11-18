@@ -41,6 +41,7 @@ This is a React + Vite application for managing and sharing AI prompts (primaril
 - Firestore collection: `prompts` with fields: `text`, `category`, `platform`, `imageUrl`, `createdAt`
 - Storage path: `prompt-images/{timestamp}-{filename}`
 - Auth: Email/password authentication
+- Firestore operations: `addDoc` (create), `updateDoc` (edit), `getDocs` (read)
 
 ### State Management
 
@@ -49,13 +50,14 @@ All state is managed in the App component using React hooks:
 - Prompts: `prompts` array, `isLoaded` flag
 - Filtering: `searchQuery`, `filterCategory`, `filterPlatform`
 - Form inputs: `newPrompt`, `newImage`, `newCategory`, `newPlatform`
+- Edit state: `editingId`, `editText`, `editCategory`, `editPlatform`, `editImage`, `editImageUrl`
 - UI state: `previewImage`
 
 ### Key Categories and Platforms
 
 **Categories**: Scenery, Emote, Character, Seasonal, Marketing, Wedding, Horror, Food, Nursery, Other
 
-**Platforms**: ChatGPT, Midjourney, Bing, Gemini
+**Platforms**: ChatGPT, Midjourney, Bing, Gemini, Grok
 
 ## Deployment Configuration
 
@@ -63,10 +65,35 @@ All state is managed in the App component using React hooks:
 - **Homepage**: `https://mikecinchan.github.io/promptlibrary`
 - Uses `gh-pages` package for automated deployment
 
+## Features
+
+### Prompt Management
+- **Create**: Only authenticated users can add new prompts with optional images
+- **Read**: All users can view, search, and filter prompts
+- **Update**: Authenticated users can edit existing prompts (text, category, platform, images)
+  - Edit mode toggles inline on prompt cards
+  - Images can be added, changed, or removed during editing
+  - Changes saved to Firestore via `updateDoc`
+- **Search & Filter**: Real-time filtering by search query, category, and platform
+
+### Edit Functionality
+When a user clicks "Edit" on a prompt card:
+- Card switches to edit mode with inline form
+- Can modify prompt text via textarea
+- Can change category and platform via dropdowns
+- Can add/change/remove images:
+  - "Remove" button appears on existing images
+  - "Add Image" or "Change Image" button for file selection
+  - New images uploaded to Firebase Storage before updating document
+- "Save" commits changes to Firestore and updates local state
+- "Cancel" discards changes and returns to view mode
+
 ## Important Notes
 
-- Only authenticated users can add prompts; all users can view and search
-- Images are uploaded to Firebase Storage before prompt creation
+- Only authenticated users can add or edit prompts; all users can view and search
+- Edit button only appears on prompt cards when user is logged in
+- Images are uploaded to Firebase Storage before prompt creation/update
 - Prompts are fetched once on mount and sorted by `createdAt` descending
 - The app uses optimistic UI updates when adding new prompts
+- Edit updates apply immediately to both Firestore and local state
 - Firebase config contains public API keys (normal for client-side Firebase apps)
