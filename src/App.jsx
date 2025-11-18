@@ -7,6 +7,8 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  doc,
+  updateDoc,
 } from "firebase/firestore";
 import {
   ref,
@@ -33,6 +35,14 @@ export default function App() {
   const [filterPlatform, setFilterPlatform] = useState("All");
 
   const [previewImage, setPreviewImage] = useState(null);
+
+  // ✅ Edit States
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editPlatform, setEditPlatform] = useState("");
+  const [editImage, setEditImage] = useState(null);
+  const [editImageUrl, setEditImageUrl] = useState(null);
 
   // ✅ Auth States
   const [user, setUser] = useState(null);
@@ -106,6 +116,65 @@ export default function App() {
     setNewPlatform("Midjourney");
   };
 
+  // ✅ Start editing a prompt
+  const handleStartEdit = (prompt) => {
+    setEditingId(prompt.id);
+    setEditText(prompt.text);
+    setEditCategory(prompt.category);
+    setEditPlatform(prompt.platform);
+    setEditImageUrl(prompt.imageUrl || null);
+    setEditImage(null);
+  };
+
+  // ✅ Cancel editing
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditText("");
+    setEditCategory("");
+    setEditPlatform("");
+    setEditImage(null);
+    setEditImageUrl(null);
+  };
+
+  // ✅ Save edited prompt
+  const handleSaveEdit = async () => {
+    if (!editText.trim()) return;
+
+    let imageUrl = editImageUrl;
+
+    // If a new image was selected, upload it
+    if (editImage) {
+      imageUrl = await uploadImageToFirebase(editImage);
+    }
+
+    const updatedData = {
+      text: editText,
+      category: editCategory,
+      platform: editPlatform,
+      imageUrl: imageUrl,
+    };
+
+    // Update in Firebase
+    const promptRef = doc(db, "prompts", editingId);
+    await updateDoc(promptRef, updatedData);
+
+    // Update local state
+    setPrompts((prev) =>
+      prev.map((p) =>
+        p.id === editingId ? { ...p, ...updatedData } : p
+      )
+    );
+
+    // Reset edit state
+    handleCancelEdit();
+  };
+
+  // ✅ Remove image during edit
+  const handleRemoveImage = () => {
+    setEditImageUrl(null);
+    setEditImage(null);
+  };
+
   // ✅ Copy prompt to clipboard
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -159,7 +228,7 @@ export default function App() {
     "Other",
   ];
 
-  const platformOptions = ["ChatGPT", "Midjourney", "Bing", "Gemini"];
+  const platformOptions = ["ChatGPT", "Midjourney", "Bing", "Gemini", "Grok"];
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-6 relative">
@@ -335,33 +404,139 @@ export default function App() {
               key={prompt.id}
               className="bg-gray-800 p-4 rounded-lg shadow-lg relative"
             >
-              {prompt.imageUrl && (
-                <div className="relative cursor-pointer">
-                  <img
-                    src={prompt.imageUrl}
-                    alt="Prompt preview"
-                    className="w-full h-40 object-cover rounded mb-2 transition-transform duration-300 hover:opacity-80"
-                    onClick={() => setPreviewImage(prompt.imageUrl)}
+              {editingId === prompt.id ? (
+                // ✅ Edit Mode
+                <div className="space-y-3">
+                  {/* Image Section */}
+                  {editImageUrl && !editImage && (
+                    <div className="relative">
+                      <img
+                        src={editImageUrl}
+                        alt="Current"
+                        className="w-full h-40 object-cover rounded"
+                      />
+                      <button
+                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white text-xs px-2 py-1 rounded"
+                        onClick={handleRemoveImage}
+                      >
+                        ✖ Remove
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Add/Change Image */}
+                  <label className="block">
+                    <span className="inline-block bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded cursor-pointer transition">
+                      {editImageUrl ? "📷 Change Image" : "📂 Add Image"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg, image/jpg"
+                      className="hidden"
+                      onChange={(e) => {
+                        setEditImage(e.target.files[0]);
+                        setEditImageUrl(null);
+                      }}
+                    />
+                    {editImage && (
+                      <span className="ml-2 text-xs text-gray-300">
+                        {editImage.name}
+                      </span>
+                    )}
+                  </label>
+
+                  {/* Text */}
+                  <textarea
+                    className="w-full p-2 rounded bg-gray-700 text-white text-sm"
+                    rows={3}
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
                   />
-                  <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-xs px-2 py-1 rounded">
-                    🔍 Click to preview
+
+                  {/* Category & Platform */}
+                  <div className="flex gap-2">
+                    <select
+                      className="flex-1 p-2 rounded bg-gray-700 text-white text-xs"
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                    >
+                      {categoryOptions.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="flex-1 p-2 rounded bg-gray-700 text-white text-xs"
+                      value={editPlatform}
+                      onChange={(e) => setEditPlatform(e.target.value)}
+                    >
+                      {platformOptions.map((plat) => (
+                        <option key={plat} value={plat}>
+                          {plat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-2 rounded transition"
+                      onClick={handleSaveEdit}
+                    >
+                      ✓ Save
+                    </button>
+                    <button
+                      className="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-xs px-3 py-2 rounded transition"
+                      onClick={handleCancelEdit}
+                    >
+                      ✖ Cancel
+                    </button>
                   </div>
                 </div>
+              ) : (
+                // ✅ View Mode
+                <>
+                  {prompt.imageUrl && (
+                    <div className="relative cursor-pointer">
+                      <img
+                        src={prompt.imageUrl}
+                        alt="Prompt preview"
+                        className="w-full h-40 object-cover rounded mb-2 transition-transform duration-300 hover:opacity-80"
+                        onClick={() => setPreviewImage(prompt.imageUrl)}
+                      />
+                      <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-xs px-2 py-1 rounded">
+                        🔍 Click to preview
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-sm text-gray-200 mb-1">{prompt.text}</p>
+                  <div className="text-xs text-gray-400 mb-8">
+                    <span className="mr-2">📂 {prompt.category}</span>
+                    <span>💻 {prompt.platform}</span>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="absolute bottom-2 right-2 flex gap-2">
+                    {user && (
+                      <button
+                        className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded transition"
+                        onClick={() => handleStartEdit(prompt)}
+                      >
+                        ✏️ Edit
+                      </button>
+                    )}
+                    <button
+                      className="bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-2 py-1 rounded transition"
+                      onClick={() => copyToClipboard(prompt.text)}
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
+                </>
               )}
-
-              <p className="text-sm text-gray-200 mb-1">{prompt.text}</p>
-              <div className="text-xs text-gray-400">
-                <span className="mr-2">📂 {prompt.category}</span>
-                <span>💻 {prompt.platform}</span>
-              </div>
-
-              {/* Copy Button */}
-              <button
-                className="absolute bottom-2 right-2 bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-2 py-1 rounded transition"
-                onClick={() => copyToClipboard(prompt.text)}
-              >
-                📋 Copy
-              </button>
             </div>
           ))}
 
